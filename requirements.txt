@@ -1,0 +1,10 @@
+numpy 
+pandas
+Pillow
+datasets
+matplotlib
+scikit-learn
+ipykernel 
+notebook
+jupyter
+pyyaml
