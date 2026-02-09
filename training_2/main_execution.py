@@ -1,8 +1,3 @@
-"""
-Step 3: Complete End-to-End CRNN Training Pipeline
-Integrates everything: preprocessing, model, training, evaluation
-"""
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,66 +7,49 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from datetime import datetime
 import os
-
-# ==================== CRNN MODEL ====================
-
 class CRNN(nn.Module):
-    """
-    Complete CRNN architecture for OCR
-    """
     
     def __init__(self, img_height=32, num_channels=1, num_classes=37, hidden_size=256):
         super(CRNN, self).__init__()
         
-        assert img_height % 16 == 0, "img_height must be divisible by 16"
+        assert img_height % 16 == 0
         
-        # Convolutional layers
         self.cnn = nn.Sequential(
-            # Layer 1: 64 filters
             nn.Conv2d(num_channels, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),  # H/2
             
-            # Layer 2: 128 filters
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),  # H/4
             
-            # Layer 3: 256 filters
             nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             
-            # Layer 4: 256 filters
             nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),  # H/8
             
-            # Layer 5: 512 filters
             nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             
-            # Layer 6: 512 filters
             nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),  # H/16
             
-            # Layer 7: 512 filters
             nn.Conv2d(512, 512, kernel_size=2, stride=1, padding=0),
             nn.ReLU(inplace=True)
         )
         
-        # Recurrent layers
         self.lstm1 = nn.LSTM(512, hidden_size, bidirectional=True, batch_first=False)
         self.lstm2 = nn.LSTM(hidden_size * 2, hidden_size, bidirectional=True, batch_first=False)
         
-        # Output layer
         self.fc = nn.Linear(hidden_size * 2, num_classes)
     
     def forward(self, x):
-        # CNN feature extraction
         conv = self.cnn(x)  # (B, 512, H', W')
         
         # Map to sequence
@@ -89,32 +67,20 @@ class CRNN(nn.Module):
         return output
 
 
-# ==================== CTC DECODER ====================
 
 def ctc_greedy_decode(outputs, alphabet):
-    """
-    Greedy CTC decoding
-    
-    Args:
-        outputs: Model outputs (seq_len, batch, num_classes)
-        alphabet: String of characters
-    
-    Returns:
-        List of decoded strings
-    """
-    # Get predictions
+
     _, preds = torch.max(outputs, dim=2)  # (seq_len, batch)
     preds = preds.transpose(1, 0).cpu().numpy()  # (batch, seq_len)
     
     decoded_texts = []
     
     for pred in preds:
-        # Remove blanks and duplicates
         chars = []
         prev_idx = -1
         
         for idx in pred:
-            if idx != 0 and idx != prev_idx:  # Not blank and not duplicate
+            if idx != 0 and idx != prev_idx: 
                 if idx - 1 < len(alphabet):
                     chars.append(alphabet[idx - 1])
             prev_idx = idx
@@ -124,12 +90,9 @@ def ctc_greedy_decode(outputs, alphabet):
     return decoded_texts
 
 
-# ==================== TRAINING FUNCTIONS ====================
 
 def train_one_epoch(model, train_loader, criterion, optimizer, device, alphabet, epoch):
-    """
-    Train for one epoch
-    """
+   
     model.train()
     total_loss = 0
     correct = 0
@@ -155,7 +118,6 @@ def train_one_epoch(model, train_loader, criterion, optimizer, device, alphabet,
         # CTC loss
         loss = criterion(log_probs, targets_concat, input_lengths, target_lengths)
         
-        # Check for NaN
         if torch.isnan(loss):
             print(f"NaN loss detected at batch {batch_idx}")
             continue
@@ -164,15 +126,13 @@ def train_one_epoch(model, train_loader, criterion, optimizer, device, alphabet,
         optimizer.zero_grad()
         loss.backward()
         
-        # Gradient clipping
         torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
         
         optimizer.step()
         
-        # Metrics
         total_loss += loss.item()
         
-        # Calculate accuracy (on a subset for speed)
+        # Calculate accuracy 
         if batch_idx % 10 == 0:
             with torch.no_grad():
                 preds = ctc_greedy_decode(outputs, alphabet)
@@ -194,9 +154,7 @@ def train_one_epoch(model, train_loader, criterion, optimizer, device, alphabet,
 
 
 def validate(model, val_loader, criterion, device, alphabet):
-    """
-    Validate the model
-    """
+    
     model.eval()
     total_loss = 0
     correct = 0
@@ -237,7 +195,6 @@ def validate(model, val_loader, criterion, device, alphabet):
     avg_loss = total_loss / len(val_loader)
     accuracy = 100.0 * correct / total
     
-    # Show some examples
     print("\nSample predictions:")
     for i in range(min(10, len(all_predictions))):
         status = "✓" if all_predictions[i].lower() == all_ground_truths[i].lower() else "✗"
@@ -246,14 +203,11 @@ def validate(model, val_loader, criterion, device, alphabet):
     return avg_loss, accuracy
 
 
-# ==================== COMPLETE TRAINING PIPELINE ====================
 
 def train_crnn_end_to_end(train_loader, val_loader, label_processor, 
                          num_epochs=50, learning_rate=0.001, 
                          device=None, save_dir='checkpoints'):
-    """
-    Complete end-to-end training pipeline
-    """
+    
     
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -270,7 +224,6 @@ def train_crnn_end_to_end(train_loader, val_loader, label_processor,
     # Create save directory
     os.makedirs(save_dir, exist_ok=True)
     
-    # ===== Initialize Model =====
     print("\n[1] Initializing CRNN Model...")
     model = CRNN(
         img_height=32,
@@ -285,12 +238,10 @@ def train_crnn_end_to_end(train_loader, val_loader, label_processor,
     print(f"✓ Total parameters: {total_params:,}")
     print(f"✓ Trainable parameters: {trainable_params:,}")
     
-    # ===== Loss and Optimizer =====
     print("\n[2] Setting up Loss and Optimizer...")
     criterion = nn.CTCLoss(blank=0, zero_infinity=True)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
     
-    # Learning rate scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=5, verbose=True
     )
@@ -299,7 +250,6 @@ def train_crnn_end_to_end(train_loader, val_loader, label_processor,
     print("✓ Optimizer: Adam")
     print("✓ LR Scheduler: ReduceLROnPlateau")
     
-    # ===== Training Loop =====
     print("\n[3] Starting Training Loop...")
     
     best_accuracy = 0
@@ -364,7 +314,6 @@ def train_crnn_end_to_end(train_loader, val_loader, label_processor,
         if epoch % 10 == 0:
             torch.save(checkpoint, os.path.join(save_dir, f'checkpoint_epoch_{epoch}.pth'))
     
-    # ===== Training Complete =====
     print("\n" + "="*70)
     print("TRAINING COMPLETE!")
     print("="*70)
@@ -400,7 +349,6 @@ def train_crnn_end_to_end(train_loader, val_loader, label_processor,
     return model, best_accuracy
 
 
-# ==================== INFERENCE FUNCTION ====================
 
 def predict_text(model, image_path, label_processor, device, img_height=32, img_width=100):
     """
@@ -442,12 +390,9 @@ def predict_text(model, image_path, label_processor, device, img_height=32, img_
     return prediction
 
 
-# ==================== MAIN EXECUTION ====================
 
 def main():
-    """
-    Main execution function - runs the complete pipeline
-    """
+    
     
     # Import preprocessing
     from preprocessing.image_preprocessing import prepare_mjsynth_for_crnn

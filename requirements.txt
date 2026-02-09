@@ -8,3 +8,6 @@ ipykernel
 notebook
 jupyter
 pyyaml
+fastapi 
+uvicorn 
+python-multipart

@@ -411,17 +411,22 @@ def prepare_mjsynth_for_crnn():
         'alphabet': label_processor.alphabet
     }
     
-if __name__ == '__main__':
-    # Run the complete preprocessing pipeline
+if __name__ == "__main__":
+    # Run preprocessing pipeline
     data = prepare_mjsynth_for_crnn()
-    
-    # Save for later use
+
+    label_processor = data["label_processor"]
+
+    # ✅ SAVE ONLY PURE DATA (NO CLASS INSTANCES)
+    label_metadata = {
+        "alphabet": label_processor.alphabet,
+        "char_to_idx": label_processor.char_to_idx,
+        "idx_to_char": label_processor.idx_to_char,
+        "num_classes": label_processor.num_classes
+    }
+
     import pickle
-    with open('preprocessing_data.pkl', 'wb') as f:
-        pickle.dump({
-            'label_processor': data['label_processor'],
-            'alphabet': data['alphabet'],
-            'num_classes': data['num_classes']
-        }, f)
-    
-    print("\n✓ Preprocessing data saved to: preprocessing_data.pkl")
+    with open("label_processor.pkl", "wb") as f:
+        pickle.dump(label_metadata, f)
+
+    print("\n✓ Label metadata saved to: label_processor.pkl")
