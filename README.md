@@ -180,12 +180,3 @@ Deployment requires careful handling of serialization
 Transformers simplify OCR but come with trade-offs
 
 Classical OCR pipelines are still highly relevant
-
-📝 Resume Summary (Optional)
-
-Built an end-to-end OCR system using a CRNN with CTC loss, including custom preprocessing, training, and GPU-accelerated FastAPI deployment. Extended the pipeline toward real-world document OCR and analyzed limitations of classical sequence-based recognition models.
-
-📌 Notes
-
-This project prioritizes understanding, modularity, and extensibility over using black-box OCR libraries.
-It is intended as both a learning resource and a strong portfolio project.
